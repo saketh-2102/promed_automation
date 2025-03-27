@@ -105,7 +105,7 @@ def process_revenue_data(df):
     
     consultation_mask = (
         df_op["HEADER"].str.strip().str.upper().isin([h.upper() for h in consultation_headers]) &
-        df_op["ADMITING DEPARTMENT"].notna() & ~others_revenue_mask
+        df_op["ADMITING DEPARTMENT"].notna()
     )
     
     procedure_mask = (
@@ -114,26 +114,41 @@ def process_revenue_data(df):
         (
             df_op["SERVICE NAME"].str.upper().str.contains("ORTHO PROCEDURE") |
             df_op["SERVICE NAME"].str.upper().str.contains("OP - PROCEDURE")
-        ) &
-        ~other_proc_charges_mask
+        ) 
     )
     
+    
+    
     op_consult_proc_mask = consultation_mask | procedure_mask
+    consultation_df = df_op[consultation_mask]
+    consultation_visits = consultation_df["IP NUMBER"].count()
+    consultation_amount = consultation_df["NET AMOUNT"].sum()
+    
+    procedure_df = df_op[procedure_mask]
+    procedure_visits = procedure_df["IP NUMBER"].count()
+    procedure_amount = procedure_df["NET AMOUNT"].sum()
+    
+    print("\nDetailed Breakdown:")
+    print(f"Consultation - Visits: {consultation_visits}, Amount: {consultation_amount:.2f}")
+    print(f"Procedures - Visits: {procedure_visits}, Amount: {procedure_amount:.2f}")
+    print(f"Combined Total: {consultation_amount + procedure_amount:.2f}\n")
+    
+    
+    # New rule for Laboratory Revenue
+    lab_revenue_mask = (
+        (df_op["HEADER"].str.strip().str.upper().isin(["LABORATORY", "PACKAGE", "HAEMATOLOGY"])) |
+        ((df_op["HEADER"].str.strip().str.upper() == "INVESTIGATION VISIT"))
+    )
     
     df_op["OP_CATEGORY"] = "Other OP Revenue"
-    df_op.loc[op_consult_proc_mask, "OP_CATEGORY"] = "OP Consultation & Procedures"
+    df_op.loc[consultation_mask | procedure_mask, "OP_CATEGORY"] = "OP Consultation & Procedures"
     df_op.loc[cardiology_proc_mask, "OP_CATEGORY"] = "OP Cardiology Procedures"
     df_op.loc[radiology_proc_mask, "OP_CATEGORY"] = "OP Radiology"
     df_op.loc[other_proc_charges_mask, "OP_CATEGORY"] = "Other Procedure & Charges"
     df_op.loc[health_checkup_mask, "OP_CATEGORY"] = "OP Health Checkup Packages"
     df_op.loc[nursing_visit_mask, "OP_CATEGORY"] = "OP Nursing Home Visit"
     df_op.loc[others_revenue_mask, "OP_CATEGORY"] = "OP Others Revenue"
-    
-    lab_headers = ["LABORATORY", "PACKAGE", "HAEMATOLOGY"]
-    df_op.loc[
-        df_op["HEADER"].str.strip().str.upper().isin([h.upper() for h in lab_headers]),
-        "OP_CATEGORY"
-    ] = "OP Laboratory Revenue"
+    df_op.loc[lab_revenue_mask, "OP_CATEGORY"] = "OP Laboratory Revenue"
     
     df_op_summary = df_op.groupby("OP_CATEGORY").agg(
         TOTAL_VISITS=("IP NUMBER", "count"),
@@ -152,6 +167,11 @@ def process_revenue_data(df):
         "Other Procedure & Charges",
     ]
     df_op_summary = df_op_summary.set_index("ADMITTING CATEGORY").loc[category_order].reset_index()
+    df_op_summary.loc[
+    df_op_summary["ADMITTING CATEGORY"] == "OP Consultation & Procedures",
+    "TOTAL_AMOUNT"
+] = consultation_amount + procedure_amount
+
     
     # Create a single Excel file with multiple sheets
     with pd.ExcelWriter("revenue_summary.xlsx") as writer:
@@ -159,7 +179,3 @@ def process_revenue_data(df):
         df_op_summary.to_excel(writer, sheet_name="OP Revenue", index=False)
     
     print("Revenue reports saved to revenue_summary.xlsx with separate sheets for IP and OP revenue.")
-
-# Example usage:
-# df = load_and_prepare_data("input_file.xlsx", "Sheet1")
-# process_revenue_data(df)

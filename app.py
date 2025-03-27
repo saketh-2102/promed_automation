@@ -1,9 +1,13 @@
 import streamlit as st
 import pandas as pd
-import io
 from functions import load_and_prepare_data, process_revenue_data
 
-def main():
+def check_login(username, password):
+    """Simple login verification"""
+    return username == "promed" and password == "promed11"
+
+def main_app():
+    """The main application that runs after successful login"""
     st.set_page_config(page_title="Hospital Revenue Analysis", layout="wide")
     st.title("🏥 Hospital Revenue Analysis Dashboard")
     
@@ -87,6 +91,32 @@ def main():
         
         The tool automatically categorizes services based on predefined rules.
         """)
+
+def login_page():
+    """Displays login form"""
+    st.title("Hospital Revenue Analysis - Login")
+    
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        submit_button = st.form_submit_button("Login")
+        
+        if submit_button:
+            if check_login(username, password):
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Invalid username or password")
+
+def main():
+    """Main function that controls the app flow"""
+    if not hasattr(st.session_state, 'logged_in'):
+        st.session_state.logged_in = False
+    
+    if st.session_state.logged_in:
+        main_app()
+    else:
+        login_page()
 
 if __name__ == "__main__":
     main()
