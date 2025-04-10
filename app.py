@@ -1,72 +1,70 @@
 import streamlit as st
 import pandas as pd
-from functions import load_and_prepare_data, process_revenue_data
+from functions import (
+    load_and_prepare_data,
+    load_pharmacy_sales_data,
+    process_revenue_data
+)
 
 def check_login(username, password):
     """Simple login verification"""
     return username == "promed" and password == "promed11"
 
+
+
 def main_app():
-    """The main application that runs after successful login"""
     st.set_page_config(page_title="Hospital Revenue Analysis", layout="wide")
     st.title("🏥 Hospital Revenue Analysis Dashboard")
     
-    # Sidebar for file upload and settings
     with st.sidebar:
         st.header("Upload Data")
         uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
         
-        if uploaded_file is not None:
+        if uploaded_file:
             st.success("File uploaded successfully!")
-            sheet_name = st.text_input("Sheet name", value="REVENUE REPORT for IP&OP")
+            sheet_revenue = st.text_input("Revenue Sheet Name", value="REVENUE REPORT for IP&OP")
+            sheet_pharmacy = st.text_input("Pharmacy Sheet Name", value="PHARMACY SALES REPORT ")
             process_button = st.button("Process Data")
         else:
             st.warning("Please upload an Excel file")
             process_button = False
-    
-    # Main content area
-    if uploaded_file is not None and process_button:
+
+    if uploaded_file and process_button:
         try:
-            # Read the uploaded file
             with st.spinner("Processing data..."):
-                df = load_and_prepare_data(uploaded_file, sheet_name)
-                
-                # Process the data
-                process_revenue_data(df)
-                
-                # Display results
-                st.success("Analysis completed successfully!")
-                
-                # Show download buttons
-                st.subheader("Download Reports")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    with open("revenue_summary.xlsx", "rb") as f:
-                        st.download_button(
-                            label="Download Full Report",
-                            data=f,
-                            file_name="revenue_summary.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        )
-                
-                with col2:
-                    # Display previews of both sheets
-                    xls = pd.ExcelFile("revenue_summary.xlsx")
-                    
-                    tab1, tab2 = st.tabs(["IP Revenue", "OP Revenue"])
-                    
-                    with tab1:
-                        ip_df = pd.read_excel(xls, sheet_name="IP Revenue")
-                        st.dataframe(ip_df)
-                    
-                    with tab2:
-                        op_df = pd.read_excel(xls, sheet_name="OP Revenue")
-                        st.dataframe(op_df)
-                
+                revenue_df = load_and_prepare_data(uploaded_file, sheet_revenue)
+                pharmacy_df = load_pharmacy_sales_data(uploaded_file, sheet_pharmacy)
+
+                process_revenue_data(revenue_df, pharmacy_df)
+
+            st.success("Analysis completed successfully!")
+            st.subheader("Download Reports")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                with open("revenue_summary.xlsx", "rb") as f:
+                    st.download_button(
+                        label="Download Full Report",
+                        data=f,
+                        file_name="revenue_summary.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+
+            with col2:
+                xls = pd.ExcelFile("revenue_summary.xlsx")
+                tab1, tab2, tab3 = st.tabs(["IP Revenue", "OP Revenue", "Pharmacy Revenue"])
+
+                with tab1:
+                    st.dataframe(pd.read_excel(xls, sheet_name="IP Revenue"))
+                with tab2:
+                    st.dataframe(pd.read_excel(xls, sheet_name="OP Revenue"))
+                with tab3:
+                    st.dataframe(pd.read_excel(xls, sheet_name="Pharmacy Revenue"))
+
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
+
 
     # Add some documentation
     with st.expander("ℹ️ How to use this application"):
